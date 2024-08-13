@@ -1,0 +1,230 @@
+---
+title: "Supplement: Estimating standard-dose and high-dose Fluzone vaccine efficacies for influenza A based on HAI titers"
+format: 
+    docx:
+      reference-doc: template.docx
+bibliography: sources.bib
+csl: american-medical-association.csl
+nocite: |
+  @blake22, @canty22, @davison97, @hvitfieldt21, @muller20, @rcoreteam23a, @wickham19, @ushey23
+---
+
+```{r}
+#| echo: false
+#| message: false
+#| include: false
+
+library(tidyverse)
+library(here)
+library(boot)
+library(NatParksPalettes)
+library(paletteer)
+```
+
+# Instructions to reproduce results
+
+The Github repository containing all necessary data and code to replicate our analysis and results can be found at: <https://github.com/ahgroup/Estimating-SDHD-VE>. 
+
+The analyses are set up as an R project. To reproduce this analysis, you will need the R and RStudio software, as well as the packages cited and listed in the Session Info below. To start, open the `.Rproj` file with RStudio. The project uses `renv` to help ensure reproducibility. Upon downloading the repository, running `renv::restore()` will download all used packages and dependencies in the versions used in conducting this analysis. 
+
+The project folder and sub-folders contain README files that provide further information. Each R script is also fully documented to allow easy reproducibility.
+
+To completely replicate our analysis and recreate most figures and tables shown in the main text and supplement, run the code scripts in the following order: 
+
+  1) processing-code.R
+  2) statistical-analysis.R
+  3) fig-gen.R
+  4) table-gen.R
+  
+The functions.R and objects.R scripts will be sourced at the beginning of every script listed above, so they do not need to run explicitly. However, the functions.R script in particular contains the code responsible for much of the analysis, such as the VE and DVE calculations and bootstrapped CIs, so alterations to estimation methods would take place in that script. 
+
+The CDC reported estimates were initially directly webscraped from the CDC website. However, several of the seasons' pages have since been archived, altering the URLs used to access them. We have therefore placed the data set with CDC reported VE in the `raw-data` folder. All values can still be checked by accessing each season's reported VE and accompanying information at <https://www.cdc.gov/flu/vaccines-work/past-seasons-estimates.html>. 
+
+We created the schematic figure shown in the main text using biorender.com.
+
+
+# Supplemental Methods 
+
+## Sensitivity Analyses
+
+## Extracted Curve 
+
+We used the software DataThief III [@tummers2006] to extract Coudeville et al.'s curve [@coudeville2010b], and used their model with various parameters until our curve matched theirs.
+
+The extracted data can be found in the `data/raw-data/coudeville_curve.txt` file of the supplement. These data are used in the `code/fig-gen.R` file to produce @fig-curve, along with a function that can take various $\alpha$ and $\beta$ parameters to estimate curves (as shown by the red dashed line in @fig-curve) to match the extracted curve. 
+
+```{r}
+#| echo: FALSE
+#| label: fig-curve
+#| fig-cap: "Extracted curve and model parameters. We compared the curve extracted from Coudeville et al.'s 2010 paper [@coudeville2010b] to the curve generated using Equation 1 in the main text and its associated alpha and beta parameters."
+knitr::include_graphics(here::here("results/figures/curve.png"))
+```
+
+## Group Comparisons 
+
+In the main text, we show the differences in vaccine efficacy (DVE). We also computed the relative difference in VE (RDVE), which is the DVE divided by the reference group value. We calculated DVE and RDVE for the three group comparisons, as follows:
+
+
+
+$$\text{DVE}_\text{OAHD_OASD} = \text{VE}_\text{OAHD} - \text{VE}_\text{OASD}$$
+
+$$\text{RDVE}_\text{OAHD_OASD} = \frac{\text{VE}_\text{OAHD} - \text{VE}_\text{OASD}}{\text{VE}_\text{OASD}}$$
+
+$$\text{DVE}_\text{OAHD_YASD} = \text{VE}_\text{OAHD} - \text{VE}_\text{YASD}$$
+
+$$\text{RDVE}_\text{OAHD_YASD} = \frac{\text{VE}_\text{OAHD} - \text{VE}_\text{YASD}}{\text{VE}_\text{YASD}}$$
+
+
+$$\text{DVE}_\text{OASD_YASD} = \text{VE}_\text{OASD} - \text{VE}_\text{YASD}$$
+
+$$\text{RDVE}_\text{OASD_YASD} = \frac{\text{VE}_\text{OASD} - \text{VE}_\text{YASD}}{\text{VE}_\text{YASD}}$$
+
+
+DVE is more intuitive, but RDVE takes baseline VE into account and thus might convey slightly different information.
+
+
+# Supplemental Results 
+
+## Titer distributions
+
+@fig-titers contains the pre- and post-vaccination H1N1 and H3N2 titer distributions stratified by age/dose group. These titers are what one might examine as endpoints in  immunogenicity studie and were the data used to estimate VE and DVE.   
+
+```{r}
+#| echo: FALSE
+#| label: fig-titers
+#| fig-cap: H1N1 (top row) and H3N2 (bottom row) pre- and post-vaccination log HAI titers by season and group. 
+knitr::include_graphics(here::here("results/figures/combined_titers.png"))
+```
+
+
+## VE Estimates 
+
+@tbl-ve shows the VE estimates and 95% confidence intervals for each season, strain type, and group. 
+
+```{r}
+#| echo: FALSE
+#| label: tbl-ve
+#| tbl-cap: "VE estimates for each group in each season and strain type"
+
+flextable::autofit(readRDS(here::here("results/tables/ve.rds")))
+```
+
+
+## DVE and RDVE Estimates 
+
+@tbl-dve shows both the DVE and RDVE estimates and 95% confidence intervals for each season, strain type, and group. 
+
+```{r}
+#| echo: FALSE
+#| label: tbl-dve
+#| tbl-cap: "DVE (labelled Absolute) and RDVE (labelled Relative) estimates for each group in each season and strain type."
+flextable::autofit(readRDS(here::here("results/tables/dve.rds"))) 
+```
+
+
+## Sensitivity analyses 
+
+To check for potential bias, we conducted sensitivity analyses related to HAI limit of detection, inclusion of participants under 18, and the method of estimating VE. 
+
+### Excluding limit of detection (LoD)
+
+Assigning all undetectable titers to the same value (5 in this case) can lead to artificial clustering at that point (@fig-lod). This clustering can bias results. To check for this in our analysis, we conducted a second analysis with a subset of observations, only including participants with titers above the limit of detection (LoD) in both pre- and post-vaccination measurement. We did not see meaningful differences in DVE results after removing LoD observations (@fig-nolod). 
+
+```{r lod}
+#| echo: FALSE
+#| label: fig-lod
+#| fig-cap: "Observed H1N1 (A) and H3N2 (B) log titers at and above the LoD. Size of point is proportional to number of participants at that value. "
+
+
+knitr::include_graphics(here::here("results/figures/lod.png"))
+```
+
+```{r nolod}
+#| echo: FALSE
+#| label: fig-nolod
+#| fig-cap: "Difference in vaccine efficacy and 95% confidence intervals, excluding LoD titers. H1N1 strains are blue points and errorbars on the left in each season, and H3N2 strains are red points and errorbars on the right in each season. Solid lines and circular points indicate results from original analysis, including all observations. Dashed lines with trainglular points indicate results from sensitivity analysis, excluding participants with pre- or post-vaccine titer at limit of detection. There was insufficient sample size in 2020 for an analysis excluding anyone with either titer at or below the LoD, so only the main analysis is shown for that year. Middle x-axis label (under year) indicates H1N1 strain, bottom x-axis label H3N2 strain. A) OASD vs. YASD: values over zero indicate higher estimated VE in older adults who received SD vaccine, while values under zero indicate higher estimated VE in younger adults. B) OAHD vs. YASD: Values over zero indicate higher estimated VE in older adults who received HD vaccine, while values under zero indicate higher estimated VE in younger adults. C) OAHD vs. OASD: Values over zero indicate higher estimated VE in older adults who received HD vaccine, while values under zero indicate higher estimated VE in older adults adults who received SD vaccine."
+
+knitr::include_graphics(here::here("results/figures/adve_nolod.png"))
+
+```
+
+### Including minors
+
+In years 2013-2016, only those aged 18 and older were eligible to participate in the vaccine trial from which the data arise. Beginning in 2017, those under 18 became eligible to and did participate (@fig-kids). Our main analysis only included those 18 years and older in all years, as our study was focused on comparing VE in different adult groups. However, we conducted an additional analysis including participants of all ages to assess if the inclusion of minors appeared to drastically change DVE estimates. The results of this sensitivity analysis appeared similar to the results of the main analysis, indicating including minors did not make the groups substantially different (@fig-withkids). 
+
+
+```{r}
+#| echo: FALSE
+#| label: fig-kids
+#| fig-cap: Participant ages across seasons in the young adult group (ages <65). Size of point is proportional to number of participants at that age. Points under the red line indiciate participants less than 18 years old. Numer of participants less than 18 years old is presented in label at bottom of x-axis. 
+knitr::include_graphics(here::here("results/figures/kids.png"))
+```
+
+```{r nokids}
+#| echo: FALSE
+#| label: fig-withkids
+#| fig-cap: "Difference in vaccine efficacy and 95% confidence intervals, including minors. H1N1 strains are blue points and errorbars on the left in each season, and H3N2 strains are red points and errorbars on the right in each season. Solid lines and circular points indicate results from original analysis, which excluded anyone under the age of 18. Dashed lines with trainglular points indicate results from sensitivity analysis, including all ages. Middle x-axis label (under year) indicates H1N1 strain, bottom x-axis label H3N2 strain. A) OASD vs. YASD: values over zero indicate higher estimated VE in older adults who received SD vaccine, while values under zero indicate higher estimated VE in younger adults. B) OAHD vs. YASD: values over zero indicate higher estimated VE in older adults who received HD vaccine, while values under zero indicate higher estimated VE in younger adults."
+
+
+knitr::include_graphics(here::here("results/figures/adve_kids.png"))
+```
+
+### Individual-based VE  
+
+### Individual Vaccine Efficacy Estimates 
+
+While the VE estimation used in the main analysis is more easily comparable to traditional VE estimates, one benefit of this data source is that we can compare individual risks pre- and post-vaccination to gauge changes in risk after intervention. We did this by calculating an individual $i$ VE as: 
+
+$$ VE_i = 1 - \frac{\text{Risk}_{i_{\text{Post-Vaccine}}}}{\text{Risk}_{i_{\text{Pre-Vaccine}}}} $$ {#eq-indve} 
+
+
+
+We then calculated the group $G$ mean of individual $i$ VEs as: 
+
+$$ \text{VE}_G = \overline{VE}_i$$ {#eq-gve}
+
+We compared these VE estimations to those calculated using the methods in the main analysis. 
+
+For both older adult groups, VE estimates appeared similar for individual- and group-based methods. However, for the younger adult group, individual-based VE estimates appeared lower than group-based VE estimates for almost every comparison (@fig-ind). 
+
+```{r}
+#| echo: FALSE
+#| label: fig-ind
+#| fig-cap: "Difference in vaccine efficacy and 95% confidence intervals, with individual-based VE. H1N1 strains are blue points and errorbars on the left in each season, and H3N2 strains are red points and errorbars on the right in each season. Solid lines and circular points indicate results from original analysis, with VE calculated based on group risk. Dashed lines with trainglular points indicate results from sensitivity analysis, with VE calculated based on individual risk changes pre- to post-vaccine. Middle x-axis label (under year) indicates H1N1 strain, bottom x-axis label H3N2 strain. A) OASD vs. YASD: values over zero indicate higher estimated VE in older adults who received SD vaccine, while values under zero indicate higher estimated VE in younger adults. B) OAHD vs. YASD: Values over zero indicate higher estimated VE in older adults who received HD vaccine, while values under zero indicate higher estimated VE in younger adults. C) OAHD vs. OASD: Values over zero indicate higher estimated VE in older adults who received HD vaccine, while values under zero indicate higher estimated VE in older adults adults who received SD vaccine."
+
+knitr::include_graphics(here::here("results/figures/adve_ind.png"))
+
+```
+
+
+### Comparisons to CDC-Reported VE 
+
+To be able to compare the results of our VE estimation method to observed VE estimates, we used yearly VE estimates from the CDC's Vaccine Effectiveness network [@cdc2022]. We regrouped our data into age groups matching CDC reporting strata: 18-49, 50-64, and 65+ (for this analysis, we excluded all under 18). We then estimated VE for these groups using the same methods described in our main analysis. We compared those VE estimates to the reported CDC VE estimates as shown in @fig-cdc. We considered our estimate to be a good match if our point estimate fell within the 95% confidence intervals of the CDC reported estimates. 
+Our estimates appeared to match reported VE in some cases, but often did not. The 65 and older group appeared to have the most similar VE to reported VE (in seasons starting in 2013, 2018, and 2019, _e.g._), but still had seasons where neither subtype's VE matching (as in 2016 and 2017). Those in the 50-64 group had some seasons where at least one subtype had similar VE (2015, 2016, and 2019, _e.g._), but also had seasons where neither estimate seemed to match (2017, 2018). The 18-49 age groups' estimates seemed to have the poorest matches - in three seasons, neither estimate matched (2015, 2016, and 2019), and seasons where there was one match, that estimate just barely fell within the observed VE's 95% CI (2013, 2014, and 2017, _e.g._).
+
+There are many factors that could impact the similarity of our estimated VE to the observed VE of that season. For example, we only estimated VE for H1N1 and H3N2 subtypes, but did not do so for influenza B subtypes, as the Fluzone HD vaccine did not include both influenza B subtypes in most seasons. Subtypes caused varying disease burden over the study period, which our estimates did not take into account (that is, if one year had a particularly high B-Yamagata burden, that would not be reflected in our estimates). Additionally, our estimates do not take antigenic drift into account. It is possible that, even if H1N1 was the dominant circulating subtype in one season, the  circulating strain was different enough from the vaccine strain that it could not be considered homologous, as all our estimates were. The observed VE also comes from a population that received unknown vaccines. We focused on HAI titers elicited from Fluzone vaccines, but this and other immunologic responses vary in different vaccines, leading to differing levels of protection. Finally, the Vaccine Effectiveness network is based on a test-negative design of individuals with potential influenza-like illness, which does not allow for any asymptomatic cases. That is, this network is mainly concerned with disease, rather than infection. 
+
+These fundamental differences in VE measurement could be further explored in analyses that include influenza B subtypes (as much as possible), compare estimated VE to observed VE in more similar populations, and explore circulating strains of each season, but those fall outside the scope of this analysis. However, future studies may benefit from these assessments to further explore the advantage of estimating VE in this way. 
+
+
+
+```{r}
+#| echo: FALSE
+#| label: fig-cdc
+#| fig-cap: "Comparisons of estimated H1N1 and H3N2 VE to CDC reported VE in three age groups across seasons"
+
+
+knitr::include_graphics(here::here("results/figures/cdc_compare.png"))
+```
+
+
+# Session info 
+
+```{r}
+sessionInfo()
+```
+
+
+\newpage
+
+# References 

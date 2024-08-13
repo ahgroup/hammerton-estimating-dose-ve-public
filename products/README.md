@@ -1,0 +1,1 @@
+The `manuscript` folder contains the `manuscript.qmd` file used to generate the `manuscript.docx` file and the `supplement.qmd` file used to generate the `supplement.docx` file. The `american-medical-association.csl` and `sources.bib` files are used to generate and format the references for the manuscript. 

@@ -1,0 +1,265 @@
+---
+title: "Estimating standard-dose and high-dose Fluzone vaccine efficacies for influenza A based on HAI titers"
+author: ""
+format: 
+    docx:
+      reference-doc: template.docx
+bibliography: sources.bib
+csl: american-medical-association.csl
+---
+
+```{r}
+#| echo: FALSE
+library(flextable)
+dat <- readRDS(here::here("data/raw-data/homologous_dat.rds"))
+ve <- 
+  readRDS(here::here("results/output/boot_ve.rds")) |> dplyr::ungroup() |>
+  dplyr::mutate(res = 
+                  paste0(round(boot_ve*100, 2), 
+                         "% (95% CI ", 
+                         round(boot_ve_lwr*100,2),
+                         ", ", 
+                         round(boot_ve_upr*100, 2), ")"))
+ive <- 
+  readRDS(here::here("results/output/boot_ive.rds")) |>
+  dplyr::ungroup() |>
+  dplyr::mutate(res = 
+                  paste0(round(boot_est*100, 2), 
+                         "% (95% CI ",  
+                         round(boot_est_lwr*100,2),
+                         ", ", 
+                         round(boot_est_upr*100, 2), ")"))
+```
+
+
+**Authors**  
+
+Savannah M. Hammerton$^{1,2}$,
+W. Zane Billings$^{1,2}$,
+Hayley Hemme$^{1}$,
+Ted M. Ross$^{3,4}$, 
+Ye Shen$^1$, 
+Andreas Handel$^{1, 2}$^,
+
+**Authors affiliations**  
+
+1. Department of Epidemiology & Biostatistics, College of Public Health, University of Georgia, Athens, GA, USA.
+2. Center for the Ecology of Infectious Diseases, The University of Georgia, Athens, GA, USA.
+3. Center for Vaccines and Immunology, University of Georgia, Athens, GA, USA.
+4. Cleveland Clinic, Port St. Lucie, 34952, FL, USA.
+
+
+^ Corresponding author: ahandel@uga.edu
+
+**Author contributions**
+
+Savannah M. Hammerton was the lead author and analyst. W. Zane Billings contributed in analysis methodology and writing. Hayley Hemme contributed in writing and reproducibility tasks and checks. Ted M. Ross was a subject matter expert for the study data and contributed in writing. Ye Shen was a subject matter expert in biostatistics/analysis methodology and contributed in writing. Andreas Handel was the senior author and contributed in writing and analysis. 
+
+**Conflicts of interest**: None of the authors declare any conflicts of interest.
+
+
+**Word count**: 2522
+
+\pagebreak
+
+# Abstract 
+
+**Background:** The high-dose (HD) Fluzone influenza vaccine is recommended for individuals 65 and older, since it was shown in past studies to improve antibody responses and vaccine efficacy (VE) compared to a standard-dose (SD) formulation. Since influenza vaccines are frequently reformulated, it is important to monitor any potential changes in VE. Traditional efficacy trials can be costly and time consuming. Conducting immunogenicity studies with updated formulations and estimating VE with immunogenicity endpoints is a more efficient way to assess these vaccines over time. Hemagglutination inhibition (HAI) titers are considered a reliable correlate of protection in influenza research have previously been used to estimate VE.
+
+**Methods:** We analyzed data from a human vaccine cohort who received the SD or HD Fluzone split-inactivated influenza vaccine during influenza seasons 2013 to 2021. We used a previously developed mathematical model to map pre- and post-vaccination HAI titers to protection probabilities, and computed differences in vaccine efficacy (VE) of the HD vaccine in older (>= 65 years) populations compared to SD vaccine in the same age group and in younger (<65 years) adults. 
+
+
+**Results:** We found that for participants aged 65 and older, the HD vaccine generally led to an improvement in estimated VE across seasons. However, we also found that HD recipients often had a lower estimated VE than younger SD recipients. 
+
+**Conclusions:** While the HD Fluzone leads to a small increase in estimated VE compared to SD in older adults, further increases in dose or other developments to improve VE should be considered.
+
+
+\pagebreak
+
+# Introduction
+
+Older adults are at increased risk of severe influenza disease and death due to immunosenescence, which is the decline in immune system function associated with aging [@haq2014]. Receipt of high-dose (HD) vaccines has been associated with improved immune responses and clinical outcomes for older adults and other immunocompromised groups [@caldera2021; @chaves2023b; @diazgranados2014b; @dunning2016; @izurieta2015; @paudel2020; @robison2018; @wilkinson2017a]. Fluzone HD is currently one of the vaccines that the CDC recommends for individuals 65 years and older [@cdc2023]. A traditional efficacy trial conducted during the 2011-2012 and 2012-2013 seasons found that Fluzone HD vaccination was associated with increased HAI titers and protection against laboratory-confirmed influenza illness [@diazgranados2014b]. More recently, a meta-analysis of studies from 2009-2010 to 2018-2019 found that Fluzone HD vaccination was associated with reduced odds of influenza-like illness compared to standard-dose (SD) vaccination across all seasons, as well as a reduced risk of hospitalization and other negative health outcomes [@lee2021; @lee2023]. While these and other studies have investigated the effects of HD vaccines and have shown improvements in outcomes for those who received them, they are often limited to two or three influenza seasons [@chaves2023b; @diazgranados2014b; @dunning2016; @robison2018]. 
+
+
+Vaccine efficacy (VE) and effectiveness (standard metrics for vaccine quality) can be measured directly using traditional endpoints observational studies and clinical trials  such as those described above [@mcmenamin2022; @cdc2022; @chaves2023b; @izurieta2015; @lee2021; @chaves2023b; @diazgranados2014b; @dunning2016; @robison2018]. However, these types of studies are generally costly and time-consuming. Immunogenicity data is easier to measure and more readily available, and therefore is often used to assess vaccines in the absence of traditional efficacy endpoints like infection and disease. Specifically, hemagglutination inhibition (HAI) titers have been established as a correlate of protection, and are frequently used in influenza vaccine development and licensure. Commonly, HAI titers $\ge$ 1:40 (seroprotection) or a four-fold increase in HAI pre- to post-vaccination to at least 1:40 (seroconversion) are thought to indicate that a vaccine appears protective [@fda2007a; @fda2007; @weir2016a]. These endpoints originate in an estimated 50% protection titer, or a titer estimated to reduce the risk of influenza infection in a population by 50%, of 1:40 established in Hobson et al.’s 1972 study [@hobson1972]. More recent studies support the relationship between HAI titer and protection from infection, though the exact mapping seems to depend on host and vaccine details [@ohmit2011; @cox2013; @krammer2020; @dunning2006; @ng2013a]. 
+
+A drawback of immunogenicity data is that while higher antibody levels are generally considered more protective, it is not immediately apparent how an increase in antibody titer maps to an increase in protection. The relationship is likely nonlinear. Relating immunogenicity data back to protection against influenza can be useful, particularly when comparing vaccines. Several models predicting the probability of protection given HAI titer have been developed to describe this relationship and may be applied to immunologic data to estimate VE in the absence of an efficacy trial or any infection data [@feldstein16; @coudeville2010b; @dudasova2021; @cowling2019].
+
+In our study, we estimated VE using vaccine immunogenicity data by applying one such previously developed model [@coudeville2010b]. This model is based on a meta-analysis of observational studies, clinical trials, and challenge studies and has since been used to compare intramuscular and intradermal vaccines, multi-dose vaccines with or without adjuvants, and protection against influenza B strains in different age cohorts [@coudeville2010; @feldstein16; @edler2024]. However, to our knowledge, it has not been used to compare dose impacts in different age groups. We applied the model to immunogenicity data spanning nine influenza seasons, comparing  HD and SD influenza vaccination in those 65 years and older and SD vaccination in those younger than 65 years. We found that HD vaccines generally led to improved estimated VE in older adults, but did not consistently yield VE estimates as high as those estimated in younger adults. 
+
+
+
+\pagebreak
+
+# Methods
+
+## Data
+
+Data are from an ongoing influenza vaccine study based in Stuart/Port St. Lucie, FL, and Pittsburgh, PA, in the 2013-2014 seasons through the 2016-2017 season and Athens, GA, starting in the 2016-2017 season. This study has been described in detail previously [@wu2022b; @sung2021b; @abreu2020a].
+
+Our analysis included a total of `r length(unique(dat$uniq_id))` antibody titer measurements from `r length(unique(dat$subject_id))` participants, ranging from 18 to `r max(dat$age)` years of age and spanning the years 2013-2021. While some individuals participated in multiple seasons, for the purpose of this analysis we treat each individual in each season as independent. We make the same assumption for the two influenza A vaccine components each season, see more details below. In each influenza season, individuals received the licensed Fluzone vaccine and had serum samples collected upon enrollment (time point D0) and at a target of 21 or 28 days after vaccination, depending on the season (time point D28). Participants 65 years and older could elect to receive the high-dose (HD, 60 µg/HA) vaccine, which has four times the dose of the standard-dose (SD, 15 µg/HA) vaccine. All participants under 65 received the SD vaccine (see @fig-methods panel A).
+
+We defined participants as being part of one of three groups: those younger than 65 years of age and who received SD vaccines (younger adults given standard dose, or YASD), those 65 years or older who received the SD vaccine (older adults given standard dose, or OASD), and those 65 years or older who received the HD vaccine (older adults given high dose, or OAHD).
+
+Since only some HD vaccines contained both influenza B strains, we focused our analysis on the influenza A H1N1 and H3N2 strains. 
+
+
+## Estimating Vaccine Efficacy (VE)
+
+Within each season, vaccine strains and age groups were assessed separately. That is, within a given season, we estimated separate VEs for each of the two influenza A vaccine components and the YASD, OASD, and OAHD groups.
+
+We used the logistic HAI titer-protection model developed by Coudeville et al. in their 2010 paper [@coudeville2010b] and applied it to pre- and post-vaccination titers ($T_i$, representing the titer for the $i$th individual) to obtain predicted probabilities of protection against influenza (@fig-methods and @eq-protection) [@coudeville2010b; @tummers2006].  
+
+$$ \text{Pr(Protection)}_i = 1 - \frac{1}{1 + e^{\beta(\log(T_i) - \alpha)}},$$ {#eq-protection}
+
+$$  \text{where} \ \alpha=3.09, \ \beta=1.42 $$
+
+The $\alpha$ parameter, or the location parameter for the model curve, is related to the 50% protection titer, and the $\beta$, or scale, parameter defines the steepness for the curve. We selected parameter values that qualitatively matched the extracted values from the the curve from the paper by Coudeville et al. [@coudeville2010b]. We then calculated the risk of influenza for individual $i$ as $\text{Risk}_i=1-\text{Pr(Protection)}_i$.
+
+Following prior work [@feldstein16; @coudeville2010b; @coudeville2010], we used pre-vaccination titers in place of a placebo group to compare estimated risk to that of the post-vaccine vaccine group. We calculated estimated VE as one minus the risk ratio, calculated using the average risk risk in each group. The estimation of VE for group $G$ is represented in @eq-ve and @fig-methods, where $G$ is one of the three groups (YASD, OASD, or OAHD). 
+
+$$ \text{VE}_G = 1 - \frac{\sum_{i=1}^N \text{Risk}_{i_{\text{Post-Vaccine}}}}{\sum_{i=1}^N \text{Risk}_{i_{\text{Pre-Vaccine}}}} $$ {#eq-ve}
+
+
+## Estimating Difference in Vaccine Efficacy (DVE)
+
+We used the VE estimates to find the difference in VE between two groups (DVE) (@eq-dve).
+
+$$ \text{DVE}_{G_A/G_B} = VE_{G_A} - VE_{G_B} $$ {#eq-dve}
+
+$G_A$ and $G_B$ refer to one of the 3 groups under consideration, namely YASD, OASD, and OAHD. In the supplement, we also show results for the relative difference in VE, which is just the DVE divided by the reference group.
+
+
+We calculated 95% confidence intervals (CIs) using the bias-corrected and accelerated (BCa) bootstrap method with 10,000 resamples [@davison1997a]. We constructed resamples separately for each group in each sub-type within each season. It is important to note that these CIs only account for the uncertainty in the data sample. Uncertainty from other sources, e.g., the uncertainty associated with the estimation of the applied titer-protection model, is not included. Since uncertainty from the protection model is not included, and because our study is a secondary data analysis without a pre-specified protocol, any hypothesis tests would have inflated error rates, and we do not report statistical tests or p-values. 
+
+
+## Sensitivity Analyses
+
+**Limits of detection.** When performing HAI assays, any undetectable titer was assigned a value of 5 [@forst2022]. To assess the impact of this HAI titer limit of detection (LoD), we conducted a sensitivity analysis using a reduced data set that excluded anyone with an HAI titer observation at the LoD of 5 at either D0 or D28 time point. 
+
+**Inclusion of participants younger than 18 years.** Because we aimed to compare dose groups in older and younger adults, our primary analysis excluded any participant under the age of 18. Starting in 2017, the study from which the data arise allowed those under 18 years old to participate. To explore whether the inclusion of minors appeared to alter results, we conducted an additional analysis including those under 18 years.
+
+**Individually matched VE analysis.** To examine the impact of comparing pre- and post-vaccine titers in each individual rather than at a group level to estimate vaccine efficacy, we computed VE for each individual based on their pre- and post-vaccination titers and compared those estimates to the ones found when using @eq-ve.
+
+Additional details and the results of these sensitivity analyses are given in the supplement.
+
+```{r methodsfig}
+#| echo: FALSE
+#| label: fig-methods
+#| fig-cap: "Schematic showing the analysis flow: In every season, participant HAI titers were measured both pre- and post-vaccination. Pre- and post- vaccine titers were mapped to predicted protection probabilities using the model defined by Coudeville et al [@coudeville2010b]. These protection probabilities were then converted to risk probabilities (1-Protection), summed, and pre- and post-vaccine group risks were compared via ratio to achieve an estimated vaccine efficacy.  Pre-vaccine titers were used to represent an unvaccinated (placebo) group. These methods were applied to both H1N1 and H3N2 titers in all seasons, the diagram shows H1N1 titers for the 2018-2019 season as example. Created with BioRender.com" 
+
+knitr::include_graphics(here::here("results/figures/MS-PanelV.png"))
+```
+
+## Implementation
+
+We conducted all analyses in `r R.Version()$version.string`. We used Data Thief III to extract the titer-protection curve [@tummers2006; @coudeville2010b]. We used the `tidyverse` suite of packages for data cleaning, processing, and plotting [@wickham2019a], the `renv` package for package management [@ushey2023], and the `boot` package for calculating bootstrap CIs [@canty2022]. Complete package information, data, and code to reproduce all analyses are available in the Supplement. 
+
+
+\pagebreak
+
+# Results
+
+## Population characteristics
+
+We included a total of  `r length(unique(dat$uniq_id))` observations from `r length(unique(dat$subject_id))` participants from seasons 2013-2021 (some participants return for multiple seasons). Group sizes varied across seasons, but older adults generally appeared to choose the HD vaccine over the SD vaccine most years, and the younger adult group tended to outnumber the combined older adult groups. Sample size and age distributions for the three groups for each season are shown in @tbl-one. @fig-methods shows pre-vaccination and post-vaccination HAI titers for the H1N1 vaccine strain in 2018. Equivalent plots for all other strains and seasons can be found in the supplement. 
+
+```{r}
+#| echo: FALSE
+#| label: tbl-one
+#| tbl-cap: "Data overview showing vaccine strains for each season (influenza A only), sample size and age ranges for the three populations we analyzed. YASD = younger adults given standard dose vaccines; OAHD = older adults given high dose vaccine; OASD = older adults given standard dose vaccine."
+
+flextable::autofit(readRDS(here::here("results/tables/tb1.rds"))) 
+
+```
+
+
+
+## Vaccine Efficacy (VE)
+
+Starting from the HAI titer distributions, we computed VE as described in the methods section for the three groups: younger adults given standard dose (YASD), those 65 years or older who received the SD vaccine (OASD), and those 65 years or older who received the HD vaccine (OAHD).
+
+@fig-ve shows VE estimates and 95% CIs for H1N1 and H3N2 across all studied influenza seasons. While the confidence intervals are wide, the point estimates suggest that in some seasons, VE estimates follow a pattern that one might expect: VE estimates were highest in the YASD group, followed by the OAHD and OASD groups, respectively (2016, 2017, and 2020 for H1N1). However, in most years, there was no clear difference between groups (2013, 2021 for H1N1 and 2013, 2014, 2015, 2019, 2021 for H3N2). In some seasons, the OAHD group had the highest VE (2014, 2015, 2018 for H1N1 and 2016, 2017 for H3N2). Overall, the patterns were variable and no consistent ordering for the 3 groups across seasons and strains was noticeable.
+
+
+
+
+```{r}
+#| echo: FALSE
+#| label: fig-ve
+#| fig-cap: "H1N1 (left) and H3N2 (right) vaccine efficacies and 95% confidence intervals across groups and seasons. See supplement for numerical values."
+knitr::include_graphics(here::here("results/figures/combined_ve.png"))
+```
+
+
+
+## Difference in Vaccine Efficacy (DVE)
+
+
+```{r contrastfig}
+#| echo: FALSE
+#| label: fig-contrasts
+#| fig-cap: "Differences in vaccine efficacy and 95% confidence intervals in A) OASD vs. YASD groups, B) OAHD vs. YASD groups and C) OAHD vs. OASD groups. Each season shows H1N1 (blue circles) and H3N2 (red triangles) strain estimates. x-axis labels indicate, year (top), H1N1 strain (middle), and  H3N2 strain (bottom). See supplement for numerical values."
+knitr::include_graphics(here::here("results/figures/adve.png"))
+
+
+```
+
+
+
+To better understand the differences between groups, we computed pairwise contrasts for each season and subtype.
+
+@fig-contrasts shows the difference between the 3 groups. While almost all confidence intervals include zero, the point estimates suggest that HD vaccines improved VE in older adults, but that younger adults still often had better VE than older adults regardless of dose.
+
+When comparing the OASD and YASD group VEs, we observed better VE in the YASD group than in the OASD group in most seasons (@fig-contrasts A). The exception is H1N1 in 2013 (possibly due to older adults having better responses to the pandemic strain) and both strains in the 2021 season. However, for the latter, the sample size for the OASD group is very low.   
+
+When comparing OAHD and YASD group VEs, we found that the HD vaccine generally elevated VE in older adults to a level that was close to that in younger adults (@fig-contrasts B), but this elevation seemed to depend on strain. For instance, in 2017, the HD vaccine boosted the H3N2 component but not the H1N1 component, and in 2018, the reverse pattern was seen. 
+
+When comparing OAHD and OASD group VEs, we saw that HD vaccines tended to improve VE in older adults for H1N1 in most seasons, but less so for H3N2 (@fig-contrasts C). Overall, the HD vaccine seemed beneficial. However, the magnitude of the impact is small. 
+
+
+## Sensitivity Analyses
+
+Overall, results of the sensitivity analyses were consistent with our main analyses. Removing participants with HAI titers below the limit of detection did not lead to any noticeable changes in the results. Including participants under 18 years of age also did not appear to have a strong impact on the results. Similarly, using each individual as their own control instead of performing group-wise VE calculations did not qualitatively change the results. Results from these analyses are presented in the supplement.
+
+
+\pagebreak
+
+# Discussion
+
+In this study, we compared standard- (SD) and high-dose (HD) Fluzone vaccines in a multi-season immunogenicity study and estimated vaccine efficacy using a previously developed model predicting the probability of protection against infection with observed HAI titer. We compared vaccine efficacy (VE) estimates in older adults who received HD vaccines (OAHD), older adults who received SD vaccines (OASD), and younger adults who received SD vaccines (YASD).
+
+We expected to see the highest VE in the YASD group, followed by the OAHD group, and the lowest VE in the OASD group. We observed this pattern for some seasons, but not all. A direct comparison of groups indicates that HD helps boost VE somewhat in older adults. However the impact is not large, and older adults still rarely reach the level of protection seen in younger adults.
+
+Our study spanned nine seasons, which allowed us to comprehensively assess the predicted impact of HD vaccines on VE. The use of pre-vaccination titer as a surrogate for the control group leads to an analysis that essentially follows a traditional vaccine efficacy study design approach using data from a non-randomized, observational cohort study. However, as participants older than 65 years were able to choose which vaccine dose to receive, the analysis did not benefit from randomization as an experimental study design would. 
+
+The main limitation of this study was also the primary reason for conducting this analysis: we did not have infection data, so our VE estimates are indirect. A preliminary comparison with epidemiological data suggested a reasonably good match between our estimates and CDC estimates [@cdc2022] (see supplement), though there were discrepancies in some seasons. In those cases, our VE estimates are generally higher than the CDC-based epidemiological estimates [@cdc2022]. 
+
+The reasons for such discrepancies could be due to factors such as mismatch between vaccine and circulating strain, waning immunity during an influenza season, vaccines other than Fluzone SD and HD being used in the population, and protective factors not captured by HAI assays [@mettelman2023; @cox2013; @reber2013; @krammer2020]. Future studies should work towards further elucidating the impact of these factors and their implications for mapping such as what we used here to go from immunogenicity to VE.
+
+To summarize, we used a previously developed computational method to map influenza HAI titers to estimates of protection. We found that in general, HD vaccines seem to increase protection, though not quite to the level of protection found in younger adults. We also found that the impact of the HD vaccine was variable and often weak. Further increases in dose might provide additional protection. 
+
+
+
+\pagebreak
+
+# References
+
+::: {#refs}
+:::
+
+\pagebreak
+
+# Appendix {.appendix}
+
+Data available in supplementary material. 
+
+**Funding sources**: 
+
+TR is supported by the Georgia Research Alliance as an Eminent Scholar. 
+AH received partial support from NIH grants/contracts U01AI150747, R01AI170116, 75N93019C00052 and 75N93021C00018. 
+YS received partial support from NIH grants/contracts R35GM146612, R01AI170116 and 75N93019C00052.
+The funders had no role in the study design, data collection and analysis, decision to publish, or preparation of the manuscript.
+
+
+
